@@ -1,0 +1,76 @@
+plugins {
+	id 'base'
+	id 'jacoco'
+}
+
+repositories {
+	mavenCentral()
+}
+
+subprojects {
+	apply plugin: 'java'
+	apply plugin: 'jacoco'
+
+	group = 'br.com.technicalchallenge'
+	version = '0.0.1-SNAPSHOT'
+
+	java {
+		toolchain {
+			languageVersion = JavaLanguageVersion.of(21)
+		}
+	}
+
+	repositories {
+		mavenCentral()
+	}
+
+	jacoco {
+		toolVersion = '0.8.14'
+	}
+
+	tasks.named('test') {
+		useJUnitPlatform()
+		finalizedBy tasks.named('jacocoTestReport')
+	}
+
+	tasks.named('jacocoTestReport') {
+		reports {
+			xml.required = true
+			html.required = true
+		}
+	}
+}
+
+tasks.register('jacocoAggregatedReport', JacocoReport) {
+	dependsOn subprojects.collect { it.tasks.named('test') }
+
+	executionData.setFrom files(subprojects.collect { "${it.layout.buildDirectory.get()}/jacoco/test.exec" })
+	classDirectories.setFrom files(subprojects.collect { it.sourceSets.main.output })
+	sourceDirectories.setFrom files(subprojects.collect { it.sourceSets.main.allSource.srcDirs })
+
+	reports {
+		xml.required = true
+		html.required = true
+		html.outputLocation = layout.buildDirectory.dir('reports/jacoco/aggregated')
+	}
+}
+
+tasks.register('jacocoAggregatedCoverageVerification', JacocoCoverageVerification) {
+	dependsOn tasks.named('jacocoAggregatedReport')
+
+	violationRules {
+		rule {
+			limit {
+				minimum = 0.80.toBigDecimal()
+			}
+		}
+	}
+
+	executionData.setFrom files(subprojects.collect { "${it.layout.buildDirectory.get()}/jacoco/test.exec" })
+	classDirectories.setFrom files(subprojects.collect { it.sourceSets.main.output })
+	sourceDirectories.setFrom files(subprojects.collect { it.sourceSets.main.allSource.srcDirs })
+}
+
+tasks.named('check') {
+	dependsOn tasks.named('jacocoAggregatedCoverageVerification')
+}
